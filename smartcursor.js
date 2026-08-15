@@ -28,15 +28,55 @@
   document.body.appendChild(dot);
   document.body.appendChild(ring);
 
+  // Geometry is declared in smartcursor.css as custom properties; the script
+  // reads back the three values it has to animate. Read once at startup and
+  // again on refresh(), never per frame — resolving custom properties forces a
+  // style recalc, which the animation loop must stay clear of.
+  const DEFAULTS = { ringSize: 34, pad: 5, ease: 0.3 };
+  const cfg = {};
+
+  // getComputedStyle returns custom properties exactly as authored ("34px",
+  // "2rem", "0.3") — it does not resolve their units. Plain numbers are parsed
+  // directly; anything else goes through a throwaway probe so the browser does
+  // the resolving (em and % therefore resolve against <body>, where it sits).
+  function toPixels(value, fallback) {
+    const v = value.trim();
+    if (!v) return fallback;
+    if (/^-?[\d.]+(px)?$/.test(v)) return parseFloat(v);
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none';
+    probe.style.width = v;
+    if (!probe.style.width) return fallback; // CSSOM rejected it as invalid
+    document.body.appendChild(probe);
+    const px = parseFloat(getComputedStyle(probe).width);
+    probe.remove();
+    return Number.isFinite(px) ? px : fallback;
+  }
+
+  function readTokens() {
+    const s = getComputedStyle(root);
+    cfg.ringSize = toPixels(s.getPropertyValue('--sc-ring-size'), DEFAULTS.ringSize);
+    cfg.pad = toPixels(s.getPropertyValue('--sc-pad'), DEFAULTS.pad);
+    // 0 would freeze the ring where it stands and >1 overshoots into
+    // oscillation; clamp, rather than let a stray value read as a broken cursor.
+    const ease = parseFloat(s.getPropertyValue('--sc-ease'));
+    cfg.ease = Number.isFinite(ease) ? Math.min(Math.max(ease, 0.01), 1) : DEFAULTS.ease;
+  }
+  readTokens();
+
+  // The lerp is asymptotic; below this distance it is snapped home so the loop
+  // can stop writing styles entirely.
+  const SNAP = 0.1;
+
   let enabled = false;
   let raf = 0;
   let seen = false; // first mousemove reveals the overlays
   let mx = innerWidth / 2, my = innerHeight / 2;
   // Ring geometry, lerped towards its target each frame.
-  let rx = mx, ry = my, rw = 34, rh = 34, rr = 17;
+  let rx = mx, ry = my, rw = cfg.ringSize, rh = cfg.ringSize, rr = cfg.ringSize / 2;
   let target = null;
-  let hoverEl = null;     // interactive element the ring morphs onto
-  let hoverRadius = 17;   // its corner radius, resolved once per hover change
+  let hoverEl = null;                    // interactive element the ring morphs onto
+  let hoverRadius = cfg.ringSize / 2;    // its corner radius, resolved once per hover change
   let dirty = false;
 
   const INTERACTIVE =
@@ -112,9 +152,9 @@
     dot.style.color = color; // glow rides on currentColor
   }
 
-  // Last values actually written to the DOM: once the lerp converges (snap
-  // below 0.1px) the loop stops touching styles entirely, so an idle pointer
-  // costs zero paint work per frame.
+  // Last values actually written to the DOM: once the lerp converges (see
+  // SNAP) the loop stops touching styles entirely, so an idle pointer costs
+  // zero paint work per frame.
   let wDotX = NaN, wDotY = NaN, wX = NaN, wY = NaN, wW = NaN, wH = NaN, wR = NaN;
 
   function loop() {
@@ -126,19 +166,22 @@
       const rect = hoverEl.getBoundingClientRect();
       tx = rect.left + rect.width / 2;
       ty = rect.top + rect.height / 2;
-      tw = rect.width + 10;
-      th = rect.height + 10;
-      tr = hoverRadius + 5;
+      // One pad on each side, and the same pad added to the radius so the
+      // inflated corners stay concentric with the element's own.
+      tw = rect.width + cfg.pad * 2;
+      th = rect.height + cfg.pad * 2;
+      tr = hoverRadius + cfg.pad;
     } else {
       if (hoverEl) { hoverEl = null; ring.classList.remove('morph'); } // re-render pulled it out
-      tx = mx; ty = my; tw = 34; th = 34; tr = 17;
+      tx = mx; ty = my;
+      tw = cfg.ringSize; th = cfg.ringSize; tr = cfg.ringSize / 2;
     }
-    const k = 0.3;
-    rx += (tx - rx) * k; if (Math.abs(tx - rx) < 0.1) rx = tx;
-    ry += (ty - ry) * k; if (Math.abs(ty - ry) < 0.1) ry = ty;
-    rw += (tw - rw) * k; if (Math.abs(tw - rw) < 0.1) rw = tw;
-    rh += (th - rh) * k; if (Math.abs(th - rh) < 0.1) rh = th;
-    rr += (tr - rr) * k; if (Math.abs(tr - rr) < 0.1) rr = tr;
+    const k = cfg.ease;
+    rx += (tx - rx) * k; if (Math.abs(tx - rx) < SNAP) rx = tx;
+    ry += (ty - ry) * k; if (Math.abs(ty - ry) < SNAP) ry = ty;
+    rw += (tw - rw) * k; if (Math.abs(tw - rw) < SNAP) rw = tw;
+    rh += (th - rh) * k; if (Math.abs(th - rh) < SNAP) rh = th;
+    rr += (tr - rr) * k; if (Math.abs(tr - rr) < SNAP) rr = tr;
 
     if (mx !== wDotX || my !== wDotY) {
       dot.style.transform = `translate3d(${mx}px, ${my}px, 0) translate(-50%, -50%)`;
@@ -228,8 +271,11 @@
   window.smartCursor = {
     setEnabled: (on) => setEnabled(on, true),
     isEnabled: () => enabled,
-    // Theme switches change the backgrounds — cached luminances are stale.
-    refresh() { lumCache = new WeakMap(); dirty = true; },
+    // Theme switches change the backgrounds — cached luminances are stale —
+    // and may retune the geometry tokens along with the palette. The running
+    // lerp picks up the new sizes on the next frame, so the ring animates to
+    // them rather than jumping.
+    refresh() { readTokens(); lumCache = new WeakMap(); dirty = true; },
   };
 
   // Opt-in: off unless explicitly enabled via the drawer toggle.

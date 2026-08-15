@@ -1,3 +1,19 @@
+/* Every size and rate the cursor uses is declared here and nowhere else. The
+   script reads --sc-ring-size, --sc-pad and --sc-ease back out of this block,
+   so retuning the cursor means editing these values only — there are no
+   geometry constants left in the JavaScript to keep in sync. Override them
+   from a stylesheet loaded after this one. */
+:root {
+  --sc-dot-size: 6px;
+  --sc-dot-glow: 6px; /* inner glow radius; the outer layer is three times this */
+  --sc-ring-size: 34px; /* idle ring diameter */
+  --sc-ring-width: 2px;
+  --sc-ring-opacity: 0.65;
+  --sc-ring-opacity-morph: 0.9;
+  --sc-pad: 5px; /* gap left between a hovered element and the ring */
+  --sc-ease: 0.3; /* 0–1: how far the ring closes on its target each frame */
+}
+
 /* Custom cursor: active only while <html> carries .sc-on, so the drawer
    toggle can switch back to the native pointer at any time. */
 html.sc-on,
@@ -15,12 +31,13 @@ html.sc-on * { cursor: none !important; }
 }
 
 .smart-cursor {
-  width: 6px;
-  height: 6px;
+  width: var(--sc-dot-size);
+  height: var(--sc-dot-size);
   border-radius: 50%;
   z-index: 99999;
   /* Two glow layers, no filter: cheap to repaint. */
-  box-shadow: 0 0 6px currentColor, 0 0 18px currentColor;
+  box-shadow: 0 0 var(--sc-dot-glow) currentColor,
+              0 0 calc(var(--sc-dot-glow) * 3) currentColor;
   transition: width 0.15s ease, height 0.15s ease, border-radius 0.15s ease,
               opacity 0.2s ease, background-color 0.2s ease;
 }
@@ -29,17 +46,20 @@ html.sc-on * { cursor: none !important; }
    JS so it can morph onto whatever it hovers — CSS must NOT transition those,
    or the two animations fight. Only paint properties transition here. */
 .smart-cursor-ring {
-  width: 34px;
-  height: 34px;
-  border: 2px solid;
-  border-radius: 17px;
+  /* The idle circle. JS overwrites these three from the first frame on, but it
+     derives them from the same tokens, so this is the identical geometry and
+     not a second declaration to keep in sync. */
+  width: var(--sc-ring-size);
+  height: var(--sc-ring-size);
+  border-radius: calc(var(--sc-ring-size) / 2);
+  border: var(--sc-ring-width) solid;
   z-index: 99998;
-  opacity: 0.65;
+  opacity: var(--sc-ring-opacity);
   transition: opacity 0.2s ease, border-color 0.2s ease;
 }
 
 /* Morphed onto an interactive element: read as its outline. */
-.smart-cursor-ring.morph { opacity: 0.9; }
+.smart-cursor-ring.morph { opacity: var(--sc-ring-opacity-morph); }
 
 /* Text-entry surfaces (inputs, terminal): the dot becomes a caret, the ring
    disappears. */

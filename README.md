@@ -27,7 +27,9 @@ The script appends its overlays to `<body>` as soon as it runs, so it must not
 run before the body exists — use `defer` (as above) or place the `<script>` tag
 at the end of `<body>`.
 
-## Configure the brand colour
+## Configure
+
+### Colour
 
 The dot reads two custom properties off `:root` and picks whichever suits the
 background it is currently over:
@@ -42,6 +44,47 @@ background it is currently over:
 Both should be readable against the surface they are named for. If a property is
 missing, that case falls back to `#a60430`. The ring's border colour is derived
 from the background automatically and is not configurable.
+
+### Size and feel
+
+Every dimension is a custom property, declared once at the top of
+`smartcursor.css`. There are no geometry constants left in the JavaScript — it
+reads the three values it animates back out of `:root` — so retuning the cursor
+means overriding these and nothing else:
+
+| Property | Default | Controls |
+|---|---|---|
+| `--sc-dot-size` | `6px` | diameter of the dot |
+| `--sc-dot-glow` | `6px` | inner glow radius; the outer layer is 3× this |
+| `--sc-ring-size` | `34px` | diameter of the idle ring |
+| `--sc-ring-width` | `2px` | ring border thickness |
+| `--sc-ring-opacity` | `0.65` | ring opacity when idle |
+| `--sc-ring-opacity-morph` | `0.9` | ring opacity when morphed onto an element |
+| `--sc-pad` | `5px` | gap left between a hovered element and the ring |
+| `--sc-ease` | `0.3` | how far the ring closes on its target each frame |
+
+Override them from a stylesheet loaded **after** `smartcursor.css`:
+
+```css
+:root {
+  --sc-ring-size: 44px;  /* a larger, looser ring */
+  --sc-pad: 8px;
+  --sc-ease: 0.18;       /* … that trails further behind the pointer */
+}
+```
+
+`--sc-ease` is a rate, not a duration: `1` snaps instantly, lower values trail
+more. It is clamped to `0.01`–`1`, since `0` would freeze the ring in place.
+
+Lengths may use any CSS unit, not just `px` — `--sc-ring-size: 2.5rem` works.
+Relative units are resolved by the browser at read time, with `em` and `%`
+resolving against `<body>`.
+
+The script reads these at startup and again on `smartCursor.refresh()`, never
+per frame — resolving custom properties forces a style recalculation, which the
+animation loop stays clear of. So a theme that also retunes sizes only needs the
+same `refresh()` call it already makes for colour; the ring animates to the new
+geometry rather than jumping to it.
 
 ## Tell it what is interactive
 
@@ -113,8 +156,9 @@ theme change those caches are stale, so call:
 smartCursor.refresh();
 ```
 
-from wherever you swap themes. This is the one hook you must remember to call;
-everything else is automatic.
+from wherever you swap themes. It drops the luminance caches and re-reads the
+size tokens, so a theme may retune geometry as well as colour. This is the one
+hook you must remember to call; everything else is automatic.
 
 ## What it handles for you
 
