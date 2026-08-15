@@ -32,7 +32,7 @@
   // reads back the three values it has to animate. Read once at startup and
   // again on refresh(), never per frame — resolving custom properties forces a
   // style recalc, which the animation loop must stay clear of.
-  const DEFAULTS = { ringSize: 34, pad: 5, ease: 0.3 };
+  const DEFAULTS = { ringSize: 34, pad: 5, ease: 0.3, caretScale: 1.2 };
   const cfg = {};
 
   // getComputedStyle returns custom properties exactly as authored ("34px",
@@ -53,14 +53,20 @@
     return Number.isFinite(px) ? px : fallback;
   }
 
+  function toNumber(value, fallback) {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
   function readTokens() {
     const s = getComputedStyle(root);
     cfg.ringSize = toPixels(s.getPropertyValue('--sc-ring-size'), DEFAULTS.ringSize);
     cfg.pad = toPixels(s.getPropertyValue('--sc-pad'), DEFAULTS.pad);
+    cfg.caretScale = toNumber(s.getPropertyValue('--sc-caret-scale'), DEFAULTS.caretScale);
     // 0 would freeze the ring where it stands and >1 overshoots into
     // oscillation; clamp, rather than let a stray value read as a broken cursor.
-    const ease = parseFloat(s.getPropertyValue('--sc-ease'));
-    cfg.ease = Number.isFinite(ease) ? Math.min(Math.max(ease, 0.01), 1) : DEFAULTS.ease;
+    const ease = toNumber(s.getPropertyValue('--sc-ease'), DEFAULTS.ease);
+    cfg.ease = Math.min(Math.max(ease, 0.01), 1);
   }
   readTokens();
 
@@ -131,6 +137,16 @@
     return raw.trim().endsWith('%') ? (v / 100) * Math.min(rect.width, rect.height) : v;
   }
 
+  // Caret height for the text under the pointer, as a CSS length — or '' to
+  // hand the dot back to --sc-dot-size. Measured on the element actually under
+  // the pointer rather than the TEXTUAL ancestor closest() matched: inside a
+  // rich editor the pointer may be over a heading or a code span with its own
+  // size, and that local size is what a native caret would take.
+  function caretHeight(el) {
+    const fs = parseFloat(getComputedStyle(el).fontSize);
+    return Number.isFinite(fs) ? `${fs * cfg.caretScale}px` : '';
+  }
+
   // Runs only when the hovered element changed.
   function applyMode() {
     const el = target;
@@ -142,6 +158,9 @@
     dot.classList.toggle('text', isText);
     ring.classList.toggle('text', isText);
     ring.classList.toggle('morph', !!hoverEl);
+    // Cheap here — applyMode only runs on a hover change, never per frame — and
+    // the dot's height transition animates the caret between text sizes.
+    dot.style.height = isText ? caretHeight(el) : '';
 
     const lum = el ? bgLuminance(el) : 0.5;
     ring.style.borderColor = lum > 0.5 ? 'rgba(40, 40, 40, 0.8)' : 'rgba(255, 255, 255, 0.85)';

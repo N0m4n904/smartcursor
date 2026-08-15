@@ -12,6 +12,8 @@
   --sc-ring-opacity-morph: 0.9;
   --sc-pad: 5px; /* gap left between a hovered element and the ring */
   --sc-ease: 0.3; /* 0–1: how far the ring closes on its target each frame */
+  --sc-caret-width: 2px;
+  --sc-caret-scale: 1.2; /* caret height as a multiple of the text's font-size */
 }
 
 /* Custom cursor: active only while <html> carries .sc-on, so the drawer
@@ -64,9 +66,12 @@ html.sc-on * { cursor: none !important; }
 /* Text-entry surfaces (inputs, terminal): the dot becomes a caret, the ring
    disappears. */
 .smart-cursor.text {
-  width: 2px;
-  height: 20px;
-  border-radius: 1px;
+  width: var(--sc-caret-width);
+  border-radius: calc(var(--sc-caret-width) / 2);
+  /* Height is written inline by JS from the hovered text's own font-size. This
+     stands in for the frame before that lands, and if the size can't be read —
+     1rem is the same assumption `font-size: medium` makes. */
+  height: calc(1rem * var(--sc-caret-scale));
 }
 .smart-cursor-ring.text { opacity: 0; }
 

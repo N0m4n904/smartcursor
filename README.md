@@ -62,6 +62,8 @@ means overriding these and nothing else:
 | `--sc-ring-opacity-morph` | `0.9` | ring opacity when morphed onto an element |
 | `--sc-pad` | `5px` | gap left between a hovered element and the ring |
 | `--sc-ease` | `0.3` | how far the ring closes on its target each frame |
+| `--sc-caret-width` | `2px` | thickness of the caret over text |
+| `--sc-caret-scale` | `1.2` | caret height as a multiple of the text's font size |
 
 Override them from a stylesheet loaded **after** `smartcursor.css`:
 
@@ -76,9 +78,30 @@ Override them from a stylesheet loaded **after** `smartcursor.css`:
 `--sc-ease` is a rate, not a duration: `1` snaps instantly, lower values trail
 more. It is clamped to `0.01`–`1`, since `0` would freeze the ring in place.
 
+Declare these on `:root`. Setting one on an individual element has no effect —
+the script resolves them from the document root, so a component cannot request
+its own ring padding.
+
 Lengths may use any CSS unit, not just `px` — `--sc-ring-size: 2.5rem` works.
 Relative units are resolved by the browser at read time, with `em` and `%`
 resolving against `<body>`.
+
+### The caret
+
+The caret is not a fixed size — it takes its height from the text it sits in,
+as `font-size × --sc-caret-scale`. An 11px field gets a 13px caret and a 32px
+one gets a 38px caret, and the dot's height transition animates between them as
+the pointer crosses from one to the other.
+
+The measurement is taken from the element **actually under the pointer**, not
+from the `input`/`textarea`/`[contenteditable]` that `TEXTUAL` matched. Inside a
+rich editor the pointer may be over a heading or a code span with its own size,
+and that local size is what a native caret would take.
+
+`--sc-caret-width` is deliberately not scaled — native carets stay thin
+regardless of text size. Override it if you want otherwise.
+
+### When the tokens are read
 
 The script reads these at startup and again on `smartCursor.refresh()`, never
 per frame — resolving custom properties forces a style recalculation, which the
