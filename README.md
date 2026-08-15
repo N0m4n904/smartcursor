@@ -14,18 +14,95 @@ per-page configuration.
 
 Two files, no build step, no dependencies.
 
+<https://github.com/N0m4n904/smartcursor>
+
 ## Install
 
-Copy `smartcursor.css` and `smartcursor.js` into your site and reference them:
+Both files must be loaded: the stylesheet carries the configuration tokens the
+script reads back, so the script alone will silently fall back to its built-in
+defaults.
+
+### From a CDN
+
+jsDelivr serves any file in a public GitHub repository with the right MIME type,
+so no hosting setup is needed — paste these two tags into your page:
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/N0m4n904/smartcursor@v1.0.0/smartcursor.css">
+<script src="https://cdn.jsdelivr.net/gh/N0m4n904/smartcursor@v1.0.0/smartcursor.js" defer></script>
+```
+
+The part after `@` is a git tag, branch or commit SHA:
+
+| Reference | URL fragment | Behaviour |
+|---|---|---|
+| Tag | `@v1.0.0` | Immutable, cached permanently. **Use this in production.** |
+| Branch | `@main` | Follows the branch, but jsDelivr caches it for up to 12 hours — an edit will not appear immediately. |
+| Commit | `@a1b2c3d` | Immutable, pins one exact revision. |
+| *(omitted)* | `smartcursor/smartcursor.js` | Resolves to the latest tag. Convenient, but a future release can change the cursor under you. |
+
+Tag a release before pointing a live site at it:
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+For a third-party CDN it is worth pinning the file contents as well as the
+version. Compute the hashes once, after pushing:
+
+```sh
+openssl dgst -sha384 -binary smartcursor.js | openssl base64 -A
+```
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/N0m4n904/smartcursor@v1.0.0/smartcursor.js"
+        integrity="sha384-<hash>" crossorigin="anonymous" defer></script>
+```
+
+### From GitHub Pages
+
+If Pages is enabled for the repository (*Settings → Pages*, source `main`), the
+files are also served correctly from:
+
+```html
+<link rel="stylesheet" href="https://n0m4n904.github.io/smartcursor/smartcursor.css">
+<script src="https://n0m4n904.github.io/smartcursor/smartcursor.js" defer></script>
+```
+
+This always reflects the current branch, with no CDN cache in front of it —
+handy while developing, less predictable for a live site.
+
+### Self-hosted
+
+Copy both files into your own site and reference them by path. This is the only
+option that works for a private repository:
 
 ```html
 <link rel="stylesheet" href="/smartcursor.css">
 <script src="/smartcursor.js" defer></script>
 ```
 
+### Do not link to raw.githubusercontent.com
+
+```html
+<!-- Does not work -->
+<script src="https://raw.githubusercontent.com/N0m4n904/smartcursor/main/smartcursor.js"></script>
+```
+
+Raw URLs are served as `text/plain` with `X-Content-Type-Options: nosniff`, so
+the browser refuses to execute the script and ignores the stylesheet. The
+failure is quiet — the page loads, the cursor simply never appears. Use jsDelivr
+or Pages instead.
+
+### Placement
+
 The script appends its overlays to `<body>` as soon as it runs, so it must not
-run before the body exists — use `defer` (as above) or place the `<script>` tag
-at the end of `<body>`.
+run before the body exists — use `defer` (as in every example above) or place
+the `<script>` tag at the end of `<body>`.
+
+Load `smartcursor.css` **before** any stylesheet of your own that overrides its
+tokens, since the defaults are declared on `:root`.
 
 ## Configure
 
