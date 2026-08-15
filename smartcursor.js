@@ -163,10 +163,17 @@
     dot.style.height = isText ? caretHeight(el) : '';
 
     const lum = el ? bgLuminance(el) : 0.5;
-    ring.style.borderColor = lum > 0.5 ? 'rgba(40, 40, 40, 0.8)' : 'rgba(255, 255, 255, 0.85)';
-    // Brand red on light surfaces; the readable brand-light on dark ones.
+    const onLight = lum > 0.5;
+    // The ring's own colour and halo are declared in the stylesheet and keyed
+    // off this class, so both are configurable and neither is duplicated here.
+    ring.classList.toggle('on-light', onLight);
+    // Whichever token is named for the surface underneath. The fallbacks apply
+    // only when smartcursor.css was not loaded — with it, :root always resolves
+    // these — and are per-surface for the same reason the tokens are: a single
+    // fallback for both branches is invisible on one of them.
     const styles = getComputedStyle(root);
-    const color = (lum > 0.5 ? styles.getPropertyValue('--brand') : styles.getPropertyValue('--brand-light')).trim() || '#a60430';
+    const color = (onLight ? styles.getPropertyValue('--brand') : styles.getPropertyValue('--brand-light')).trim()
+      || (onLight ? '#1a1a1a' : '#f5f5f5');
     dot.style.backgroundColor = color;
     dot.style.color = color; // glow rides on currentColor
   }

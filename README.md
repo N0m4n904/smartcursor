@@ -118,9 +118,31 @@ background it is currently over:
 }
 ```
 
-Both should be readable against the surface they are named for. If a property is
-missing, that case falls back to `#a60430`. The ring's border colour is derived
-from the background automatically and is not configurable.
+Both should be readable against the surface they are named for. Leave them alone
+and the dot is near-black on light surfaces and near-white on dark ones —
+unbranded, but visible on both. The defaults are declared in `smartcursor.css`
+like every other token; the script only falls back to its own copy of them if
+the stylesheet was never loaded.
+
+The ring is toned the same way, and carries a halo in the opposite tone:
+
+| Property | Default | Controls |
+|---|---|---|
+| `--sc-ring-on-light` | `rgba(40, 40, 40, 0.8)` | ring border over a light surface |
+| `--sc-ring-on-dark` | `rgba(255, 255, 255, 0.85)` | ring border over a dark surface |
+| `--sc-halo-on-light` | `rgba(255, 255, 255, 0.55)` | halo over a light surface |
+| `--sc-halo-on-dark` | `rgba(0, 0, 0, 0.45)` | halo over a dark surface |
+| `--sc-ring-halo` | `1px` | halo thickness each side of the border; `0` removes it |
+
+The halo exists because the cursor cannot see everything it sits on. Luminance is
+measured by walking up from the hovered element to the first background colour —
+and an image, a video, a canvas or a CSS gradient paints no background colour, so
+the walk goes straight past it to the surface behind. A light photo on a dark page
+is therefore read as dark, and a ring toned for that page disappears on top of it.
+Sampling the pixels instead is not an option: a cross-origin image taints the
+canvas, and a readback per hover is exactly the forced work the animation loop is
+built to avoid. So the ring is drawn `halo | border | halo`, which keeps an edge
+against any surface, measured or not.
 
 ### Size and feel
 
@@ -287,7 +309,12 @@ above that, the cursor will be drawn behind it — lower your stack or raise the
 Do **not** add CSS transitions for the ring's `transform`, `width`, `height` or
 `border-radius`. Those are interpolated per frame in JavaScript and a CSS
 transition on the same properties will fight the animation. Only paint properties
-(`opacity`, `border-color`, `background-color`) transition in CSS.
+(`opacity`, `border-color`, `background-color`, `box-shadow`) transition in CSS.
+
+The ring's tone is switched by a `.on-light` class the script adds when the
+surface under the pointer measures light, so restyling the ring means overriding
+`.smart-cursor-ring` and `.smart-cursor-ring.on-light` — or, more simply, the
+tokens above.
 
 ## Performance
 

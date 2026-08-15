@@ -14,6 +14,21 @@
   --sc-ease: 0.3; /* 0–1: how far the ring closes on its target each frame */
   --sc-caret-width: 2px;
   --sc-caret-scale: 1.2; /* caret height as a multiple of the text's font-size */
+
+  /* Dot colour, named for the surface it is used on. Override both with your
+     own brand; each must be readable against the surface it is named for. */
+  --brand: #1a1a1a; /* on light surfaces */
+  --brand-light: #f5f5f5; /* on dark surfaces */
+
+  /* Ring colour, likewise, plus a halo in the opposite tone. The halo is what
+     keeps the ring readable on images and gradients: neither paints a
+     background colour, so the luminance probe walks past them to the surface
+     behind, and a ring toned for that surface can vanish on top of them. */
+  --sc-ring-on-light: rgba(40, 40, 40, 0.8);
+  --sc-ring-on-dark: rgba(255, 255, 255, 0.85);
+  --sc-halo-on-light: rgba(255, 255, 255, 0.55);
+  --sc-halo-on-dark: rgba(0, 0, 0, 0.45);
+  --sc-ring-halo: 1px; /* thickness on each side of the border; 0 removes it */
 }
 
 /* Custom cursor: active only while <html> carries .sc-on, so the drawer
@@ -57,7 +72,20 @@ html.sc-on * { cursor: none !important; }
   border: var(--sc-ring-width) solid;
   z-index: 99998;
   opacity: var(--sc-ring-opacity);
-  transition: opacity 0.2s ease, border-color 0.2s ease;
+  /* Dark surface is the default; JS adds .on-light when the probe measures a
+     light one. The two shadows sandwich the border — halo, ring, halo — so it
+     keeps an edge against whatever it is actually drawn on. Both follow the
+     border-radius JS lerps per frame, and paint only: no layout, no reflow. */
+  border-color: var(--sc-ring-on-dark);
+  box-shadow: 0 0 0 var(--sc-ring-halo) var(--sc-halo-on-dark),
+              inset 0 0 0 var(--sc-ring-halo) var(--sc-halo-on-dark);
+  transition: opacity 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.smart-cursor-ring.on-light {
+  border-color: var(--sc-ring-on-light);
+  box-shadow: 0 0 0 var(--sc-ring-halo) var(--sc-halo-on-light),
+              inset 0 0 0 var(--sc-ring-halo) var(--sc-halo-on-light);
 }
 
 /* Morphed onto an interactive element: read as its outline. */
