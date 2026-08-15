@@ -1,0 +1,63 @@
+/* Custom cursor: active only while <html> carries .sc-on, so the drawer
+   toggle can switch back to the native pointer at any time. */
+html.sc-on,
+html.sc-on * { cursor: none !important; }
+
+.smart-cursor,
+.smart-cursor-ring {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  /* Position comes from JS as a translate3d transform (compositor-only, no
+     layout/paint) — never via left/top. */
+  will-change: transform;
+}
+
+.smart-cursor {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  z-index: 99999;
+  /* Two glow layers, no filter: cheap to repaint. */
+  box-shadow: 0 0 6px currentColor, 0 0 18px currentColor;
+  transition: width 0.15s ease, height 0.15s ease, border-radius 0.15s ease,
+              opacity 0.2s ease, background-color 0.2s ease;
+}
+
+/* The ring's geometry (position, size, corner radius) is lerped per frame by
+   JS so it can morph onto whatever it hovers — CSS must NOT transition those,
+   or the two animations fight. Only paint properties transition here. */
+.smart-cursor-ring {
+  width: 34px;
+  height: 34px;
+  border: 2px solid;
+  border-radius: 17px;
+  z-index: 99998;
+  opacity: 0.65;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+/* Morphed onto an interactive element: read as its outline. */
+.smart-cursor-ring.morph { opacity: 0.9; }
+
+/* Text-entry surfaces (inputs, terminal): the dot becomes a caret, the ring
+   disappears. */
+.smart-cursor.text {
+  width: 2px;
+  height: 20px;
+  border-radius: 1px;
+}
+.smart-cursor-ring.text { opacity: 0; }
+
+/* Hidden until the first mouse move, and while the pointer is off-window. */
+.smart-cursor.off,
+.smart-cursor-ring.off { opacity: 0; }
+
+/* Touch devices: no pointer to replace. */
+@media (hover: none) {
+  .smart-cursor,
+  .smart-cursor-ring { display: none !important; }
+  html.sc-on,
+  html.sc-on * { cursor: auto !important; }
+}
