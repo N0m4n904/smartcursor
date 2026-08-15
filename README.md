@@ -293,6 +293,13 @@ hook you must remember to call; everything else is automatic.
   exit.
 - **Pointer leaving the window** — the overlays fade out on `mouseout` with no
   related target, and on window `blur` (Alt-Tab).
+- **Embedded documents** — `iframe`, `embed` and `object` get the native cursor
+  back for as long as the pointer is inside one. Their content is a separate
+  document: `cursor: none` does not apply to it, and no move events from inside
+  it reach this script, so overlays that kept drawing would simply hang at the
+  frame's edge until the pointer came out again. Nothing can paint a custom
+  cursor *inside* a cross-origin frame — a YouTube or Instagram embed will
+  always show the visitor's own pointer.
 - **The page changing under a resting pointer** — clicking something that opens a
   modal or closes a drawer produces no `mousemove`, so the ring would keep
   hugging a now-covered element. The target is re-resolved once after each click.

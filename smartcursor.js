@@ -234,6 +234,15 @@
     ring.classList.add('off');
   }
 
+  // An embedded document is not ours to draw on: cursor:none does not reach
+  // into it, and the pointer's movements inside it are never reported here.
+  // Left alone the overlays would hang at its edge for as long as the pointer
+  // was inside. They yield to the native cursor instead, which is the same
+  // thing they already do when the pointer leaves the window.
+  function overFrame(el) {
+    return !!(el && el.closest && el.closest('iframe, embed, object'));
+  }
+
   function onMove(e) {
     mx = e.clientX;
     my = e.clientY;
@@ -241,12 +250,14 @@
       seen = true;
       rx = mx; ry = my; // ring starts on the pointer, not lerping across the page
     }
-    show();
+    if (overFrame(e.target)) hide(); else show();
     if (e.target !== target) { target = e.target; dirty = true; }
   }
   // mouseleave on document misses fast exits in some engines; mouseout with an
   // empty relatedTarget reliably marks "left the window", blur covers Alt+Tab.
-  function onOut(e) { if (!e.relatedTarget) hide(); }
+  // A related target that is a frame means the pointer crossed into it, which
+  // can happen faster than a move event lands on the frame itself.
+  function onOut(e) { if (!e.relatedTarget || overFrame(e.relatedTarget)) hide(); }
 
   // Fullscreen renders its element in the browser's top layer, above every
   // body-level overlay — the cursor would vanish while cursor:none still
