@@ -29,6 +29,13 @@
   --sc-halo-on-light: rgba(255, 255, 255, 0.55);
   --sc-halo-on-dark: rgba(0, 0, 0, 0.45);
   --sc-ring-halo: 1px; /* thickness on each side of the border; 0 removes it */
+
+  /* A drawn ring instead of a bordered box. Set --sc-sketch to 1 to turn it
+     on; the wiggle is how far the line strays and the rate how often it is
+     redrawn, in seconds. The halo does not apply to a drawn ring. */
+  --sc-sketch: 0;
+  --sc-sketch-wiggle: 2px;
+  --sc-sketch-rate: 0.3;
 }
 
 /* Custom cursor: active only while <html> carries .sc-on, so the drawer
@@ -113,4 +120,37 @@ html.sc-on * { cursor: none !important; }
   .smart-cursor-ring { display: none !important; }
   html.sc-on,
   html.sc-on * { cursor: auto !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   The drawn ring. The box keeps its position and size — everything the script
+   lerps still applies — but its edge is a path rather than a border, so the
+   stroke can wander off the box and must not be clipped to it.
+   --------------------------------------------------------------------------- */
+
+.smart-cursor-ring.sketch {
+  border-color: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.smart-cursor-ring.sketch svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.smart-cursor-ring.sketch path {
+  fill: none;
+  stroke: var(--sc-ring-on-dark);
+  stroke-width: var(--sc-ring-width);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: stroke 0.2s ease;
+}
+
+.smart-cursor-ring.sketch.on-light path {
+  stroke: var(--sc-ring-on-light);
 }

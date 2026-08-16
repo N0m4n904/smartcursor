@@ -28,11 +28,97 @@
   document.body.appendChild(dot);
   document.body.appendChild(ring);
 
+  // --- the drawn ring -------------------------------------------------------
+  //
+  // In sketch mode the ring is not a bordered box but a path this file draws.
+  // The deviations are worked out once, as fractions of a wiggle, and mapped
+  // onto whatever rectangle the ring currently is — so the wobble belongs to
+  // the ring and holds still while it moves, instead of being rolled afresh
+  // every frame, which would read as noise. Two sets of them, swapped a few
+  // times a second, are what a redrawn line looks like.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const SAMPLES = 34;
+  let sketchSvg = null;
+  let sketchPath = null;
+  let hands = null;
+  let hand = 0;
+  let lastBoil = 0;
+  let sW = -1, sH = -1, sR = -1;
+
+  function makeHands() {
+    let seed = 1712;
+    const next = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648 - 0.5;
+    };
+    const one = () => {
+      const out = new Array(SAMPLES);
+      for (let i = 0; i < SAMPLES; i++) out[i] = next() * 2;
+      return out;
+    };
+    return [one(), one()];
+  }
+
+  // A point and its outward normal at a distance along a rounded rectangle,
+  // which is the one shape the ring ever takes: a circle is simply the case
+  // where the corners have eaten both sides.
+  function ringPath(w, h, r, deviations, wiggle) {
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    const flatX = Math.max(0, w - 2 * r);
+    const flatY = Math.max(0, h - 2 * r);
+    const arc = (Math.PI * r) / 2;
+    const perimeter = 2 * flatX + 2 * flatY + 4 * arc;
+    if (perimeter <= 0) return '';
+
+    const pts = new Array(SAMPLES);
+    for (let i = 0; i < SAMPLES; i++) {
+      let s = (i / SAMPLES) * perimeter;
+      let x, y, nx, ny, a;
+      if (s < flatX) { x = r + s; y = 0; nx = 0; ny = -1; }
+      else if ((s -= flatX) < arc) { a = -Math.PI / 2 + (s / arc) * (Math.PI / 2); x = w - r + Math.cos(a) * r; y = r + Math.sin(a) * r; nx = Math.cos(a); ny = Math.sin(a); }
+      else if ((s -= arc) < flatY) { x = w; y = r + s; nx = 1; ny = 0; }
+      else if ((s -= flatY) < arc) { a = (s / arc) * (Math.PI / 2); x = w - r + Math.cos(a) * r; y = h - r + Math.sin(a) * r; nx = Math.cos(a); ny = Math.sin(a); }
+      else if ((s -= arc) < flatX) { x = w - r - s; y = h; nx = 0; ny = 1; }
+      else if ((s -= flatX) < arc) { a = Math.PI / 2 + (s / arc) * (Math.PI / 2); x = r + Math.cos(a) * r; y = h - r + Math.sin(a) * r; nx = Math.cos(a); ny = Math.sin(a); }
+      else if ((s -= arc) < flatY) { x = 0; y = h - r - s; nx = -1; ny = 0; }
+      else { a = Math.PI + ((s - flatY) / arc) * (Math.PI / 2); x = r + Math.cos(a) * r; y = r + Math.sin(a) * r; nx = Math.cos(a); ny = Math.sin(a); }
+      const off = deviations[i] * wiggle;
+      pts[i] = [x + nx * off, y + ny * off];
+    }
+
+    // Closed Catmull-Rom through the points, written as cubics: straight lines
+    // between deviations would read as a polygon rather than a drawn line.
+    let d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+    for (let i = 0; i < SAMPLES; i++) {
+      const p0 = pts[(i - 1 + SAMPLES) % SAMPLES];
+      const p1 = pts[i];
+      const p2 = pts[(i + 1) % SAMPLES];
+      const p3 = pts[(i + 2) % SAMPLES];
+      d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + ' ' + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) +
+           ' ' + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + ' ' + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) +
+           ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+    }
+    return d + 'Z';
+  }
+
+  function applySketch() {
+    ring.classList.toggle('sketch', !!cfg.sketch);
+    if (cfg.sketch && !sketchSvg) {
+      hands = makeHands();
+      sketchSvg = document.createElementNS(SVG_NS, 'svg');
+      sketchSvg.setAttribute('preserveAspectRatio', 'none');
+      sketchPath = document.createElementNS(SVG_NS, 'path');
+      sketchSvg.appendChild(sketchPath);
+      ring.appendChild(sketchSvg);
+    }
+    sW = sH = sR = -1; // whatever was drawn was drawn for other tokens
+  }
+
   // Geometry is declared in smartcursor.css as custom properties; the script
   // reads back the three values it has to animate. Read once at startup and
   // again on refresh(), never per frame — resolving custom properties forces a
   // style recalc, which the animation loop must stay clear of.
-  const DEFAULTS = { ringSize: 34, pad: 5, ease: 0.3, caretScale: 1.2 };
+  const DEFAULTS = { ringSize: 34, pad: 5, ease: 0.3, caretScale: 1.2, wiggle: 2, boil: 0.3 };
   const cfg = {};
 
   // getComputedStyle returns custom properties exactly as authored ("34px",
@@ -67,6 +153,11 @@
     // oscillation; clamp, rather than let a stray value read as a broken cursor.
     const ease = toNumber(s.getPropertyValue('--sc-ease'), DEFAULTS.ease);
     cfg.ease = Math.min(Math.max(ease, 0.01), 1);
+    // A drawn ring rather than a bordered box: off unless a page asks for it.
+    cfg.sketch = toNumber(s.getPropertyValue('--sc-sketch'), 0) > 0.5;
+    cfg.wiggle = toPixels(s.getPropertyValue('--sc-sketch-wiggle'), DEFAULTS.wiggle);
+    cfg.boil = toNumber(s.getPropertyValue('--sc-sketch-rate'), DEFAULTS.boil) * 1000;
+    applySketch();
   }
   readTokens();
 
@@ -85,13 +176,29 @@
   let hoverRadius = cfg.ringSize / 2;    // its corner radius, resolved once per hover change
   let dirty = false;
 
-  const INTERACTIVE =
+  // What the ring morphs onto, and what yields to a caret. Editing these two
+  // lines is the usual way to fit the cursor to a page — but a page taking this
+  // file from a CDN cannot edit anything in it, so both are also settable at
+  // runtime through the API at the bottom of this file.
+  const DEFAULT_INTERACTIVE =
     'a, button, select, label, summary, [role="button"], .card, .server-card, .tab, .link-btn';
   // Typable surfaces get the caret. Clickable inputs (checkbox/radio/buttons)
   // deliberately stay in ring mode; the SSH terminal counts as text.
-  const TEXTUAL =
+  const DEFAULT_TEXTUAL =
     'input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]),' +
     'textarea, [contenteditable="true"], .xterm';
+
+  let INTERACTIVE = DEFAULT_INTERACTIVE;
+  let TEXTUAL = DEFAULT_TEXTUAL;
+
+  // Throwing here, at the call, beats throwing later from inside a mousemove
+  // handler whose stack says nothing about who set it.
+  function checked(selector, fallback) {
+    if (!selector) return fallback;
+    document.querySelector(selector);
+    return selector;
+  }
+
 
   function parseRGB(str) {
     const m = /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/i.exec(str || '');
@@ -221,6 +328,17 @@
     if (rh !== wH) { ring.style.height = `${rh}px`; wH = rh; }
     if (rr !== wR) { ring.style.borderRadius = `${rr}px`; wR = rr; }
 
+    if (cfg.sketch && sketchPath) {
+      const now = performance.now();
+      let redraw = false;
+      if (now - lastBoil >= cfg.boil) { lastBoil = now; hand ^= 1; redraw = true; }
+      if (rw !== sW || rh !== sH || rr !== sR) { sW = rw; sH = rh; sR = rr; redraw = true; }
+      if (redraw) {
+        sketchSvg.setAttribute('viewBox', `0 0 ${rw.toFixed(1)} ${rh.toFixed(1)}`);
+        sketchPath.setAttribute('d', ringPath(rw, rh, rr, hands[hand], cfg.wiggle));
+      }
+    }
+
     if (dirty) { dirty = false; applyMode(); }
     raf = requestAnimationFrame(loop);
   }
@@ -308,6 +426,11 @@
   window.smartCursor = {
     setEnabled: (on) => setEnabled(on, true),
     isEnabled: () => enabled,
+    // What the ring morphs onto, and what hands it a caret. Pass nothing to go
+    // back to the built-in list. Both throw on an unusable selector, here,
+    // rather than from a mousemove handler later.
+    setInteractive(selector) { INTERACTIVE = checked(selector, DEFAULT_INTERACTIVE); dirty = true; },
+    setTextual(selector) { TEXTUAL = checked(selector, DEFAULT_TEXTUAL); dirty = true; },
     // Theme switches change the backgrounds — cached luminances are stale —
     // and may retune the geometry tokens along with the palette. The running
     // lerp picks up the new sizes on the next frame, so the ring animates to

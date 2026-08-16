@@ -226,6 +226,19 @@ const TEXTUAL =
 (`.card`, `.server-card`, `.tab`, `.link-btn`, and `.xterm` in `TEXTUAL`) with
 your own — they are examples, not part of the library.
 
+Editing the file is not an option when you load it from a CDN, so both can be
+set at runtime instead:
+
+```js
+smartCursor.setInteractive('a, button, [role="button"], .tags li');
+smartCursor.setTextual('input, textarea, [contenteditable="true"]');
+```
+
+Each replaces the whole list, so include what you still want. Call either with
+no argument to return to the built-in one. An unusable selector throws at the
+call rather than later from inside a mouse handler, where the stack would not
+say who set it.
+
 `TEXTUAL` wins over `INTERACTIVE`: anything matching it gets the caret. It is
 meant for *typable* surfaces. Clickable inputs — checkboxes, radios, and the
 button-like input types — are excluded on purpose so they keep the ring.
@@ -303,6 +316,28 @@ hook you must remember to call; everything else is automatic.
 - **The page changing under a resting pointer** — clicking something that opens a
   modal or closes a drawer produces no `mousemove`, so the ring would keep
   hugging a now-covered element. The target is re-resolved once after each click.
+
+## A drawn ring
+
+The ring is a bordered box by default. Set `--sc-sketch` to `1` and it becomes a
+line this script draws instead — one that wanders, and is redrawn a few times a
+second, the way animated hand-drawn linework is two drawings swapped rather than
+one held still.
+
+| Property | Default | Controls |
+|---|---|---|
+| `--sc-sketch` | `0` | `1` draws the ring instead of bordering it |
+| `--sc-sketch-wiggle` | `2px` | how far the line strays from true |
+| `--sc-sketch-rate` | `0.3` | seconds between redraws |
+
+The deviations are worked out once, as fractions of the wiggle, and mapped onto
+whatever rectangle the ring currently is. So the wobble belongs to the ring and
+holds still while it moves and morphs — rolling fresh numbers every frame would
+read as noise rather than as a drawn line.
+
+`--sc-ring-on-light` and `--sc-ring-on-dark` still colour it, and
+`--sc-ring-width` is still its weight. The halo does not apply: it is a pair of
+box shadows, and there is no box to cast them.
 
 ## CSS notes
 
