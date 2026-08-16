@@ -46,6 +46,7 @@
   const MOST = 64;
   const PROFILE = 64;
   let sketchSvg = null;
+  let sketching = false;   // drawn only while the ring is hugging something
   let sketchPath = null;
   let hands = null;
   let hand = 0;
@@ -113,7 +114,6 @@
   }
 
   function applySketch() {
-    ring.classList.toggle('sketch', !!cfg.sketch);
     if (cfg.sketch && !sketchSvg) {
       hands = makeHands();
       sketchSvg = document.createElementNS(SVG_NS, 'svg');
@@ -129,7 +129,7 @@
   // reads back the three values it has to animate. Read once at startup and
   // again on refresh(), never per frame — resolving custom properties forces a
   // style recalc, which the animation loop must stay clear of.
-  const DEFAULTS = { ringSize: 34, pad: 5, ease: 0.3, caretScale: 1.2, wiggle: 2, boil: 0.3 };
+  const DEFAULTS = { ringSize: 34, pad: 5, ease: 0.3, caretScale: 1.2, wiggle: 2, boil: 0 };
   const cfg = {};
 
   // getComputedStyle returns custom properties exactly as authored ("34px",
@@ -276,6 +276,14 @@
     dot.classList.toggle('text', isText);
     ring.classList.toggle('text', isText);
     ring.classList.toggle('morph', !!hoverEl);
+    // Idle, the ring is a plain circle: a drawn line says "this is the shape of
+    // the thing under me", which is only true once there is something under it.
+    const draw = !!(cfg.sketch && hoverEl && !isText);
+    if (draw !== sketching) {
+      sketching = draw;
+      ring.classList.toggle('sketch', draw);
+      sW = sH = sR = -1; // the drawing that is there was made for another shape
+    }
     // Cheap here — applyMode only runs on a hover change, never per frame — and
     // the dot's height transition animates the caret between text sizes.
     dot.style.height = isText ? caretHeight(el) : '';
@@ -339,11 +347,23 @@
     if (rh !== wH) { ring.style.height = `${rh}px`; wH = rh; }
     if (rr !== wR) { ring.style.borderRadius = `${rr}px`; wR = rr; }
 
-    if (cfg.sketch && sketchPath) {
-      const now = performance.now();
-      let redraw = false;
-      if (now - lastBoil >= cfg.boil) { lastBoil = now; hand ^= 1; redraw = true; }
-      if (rw !== sW || rh !== sH || rr !== sR) { sW = rw; sH = rh; sR = rr; redraw = true; }
+    if (sketching && sketchPath) {
+      // Moving costs nothing here: position is the transform written above, and
+      // the drawing only has to be rebuilt when the ring changes shape. Redoing
+      // it every frame means handing the browser a fresh path string to parse
+      // sixty times a second, which is what made the ring trail the pointer.
+      // Half a pixel is the threshold, since the lerp arrives asymptotically
+      // and would otherwise never stop nudging the last hundredth.
+      let redraw = Math.abs(rw - sW) > 0.5 || Math.abs(rh - sH) > 0.5 || Math.abs(rr - sR) > 0.5;
+      if (redraw) { sW = rw; sH = rh; sR = rr; }
+      // A rate of zero holds one drawing: the swap is what makes hand-drawn
+      // linework live at the size of a card, and what makes it flicker at the
+      // size of a cursor, so it is not something to have on by default.
+      if (cfg.boil > 0 && performance.now() - lastBoil >= cfg.boil) {
+        lastBoil = performance.now();
+        hand ^= 1;
+        redraw = true;
+      }
       if (redraw) {
         sketchSvg.setAttribute('viewBox', `0 0 ${rw.toFixed(1)} ${rh.toFixed(1)}`);
         sketchPath.setAttribute('d', ringPath(rw, rh, rr, hands[hand], cfg.wiggle));

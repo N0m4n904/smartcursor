@@ -35,7 +35,7 @@
      redrawn, in seconds. The halo does not apply to a drawn ring. */
   --sc-sketch: 0;
   --sc-sketch-wiggle: 2px;
-  --sc-sketch-rate: 0.3;
+  --sc-sketch-rate: 0; /* seconds between redraws; 0 holds one drawing */
 }
 
 /* Custom cursor: active only while <html> carries .sc-on, so the drawer
@@ -132,6 +132,12 @@ html.sc-on * { cursor: none !important; }
   border-color: transparent;
   box-shadow: none;
   overflow: visible;
+}
+
+/* The drawing is only present while the ring is hugging something; idle, the
+   bordered circle above is the whole cursor. */
+.smart-cursor-ring:not(.sketch) svg {
+  display: none;
 }
 
 .smart-cursor-ring.sketch svg {

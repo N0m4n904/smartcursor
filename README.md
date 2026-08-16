@@ -320,15 +320,21 @@ hook you must remember to call; everything else is automatic.
 ## A drawn ring
 
 The ring is a bordered box by default. Set `--sc-sketch` to `1` and it becomes a
-line this script draws instead — one that wanders, and is redrawn a few times a
-second, the way animated hand-drawn linework is two drawings swapped rather than
-one held still.
+drawn line — one that wanders rather than running true — for as long as it is
+hugging something. Idle it stays the plain circle: a drawn outline says "this is
+the shape of the thing under me", which is only true once there is something
+under it.
 
 | Property | Default | Controls |
 |---|---|---|
 | `--sc-sketch` | `0` | `1` draws the ring instead of bordering it |
 | `--sc-sketch-wiggle` | `2px` | how far the line strays from true |
-| `--sc-sketch-rate` | `0.3` | seconds between redraws |
+| `--sc-sketch-rate` | `0` | seconds between redraws; `0` holds a single drawing |
+
+Redrawing is off by default. Swapping between two drawings is what makes
+hand-drawn linework live at the size of a card, but a cursor sits under the eye
+and the same swap reads as a flicker there — set `--sc-sketch-rate` to a number
+of seconds only if you want it.
 
 The deviations are worked out once, as fractions of the wiggle, and mapped onto
 whatever rectangle the ring currently is. So the wobble belongs to the ring and
