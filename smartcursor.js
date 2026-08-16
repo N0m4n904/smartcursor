@@ -37,7 +37,14 @@
   // every frame, which would read as noise. Two sets of them, swapped a few
   // times a second, are what a redrawn line looks like.
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const SAMPLES = 34;
+  // How far apart the deviations sit, along the line. Density is what has to
+  // stay constant, not their number: a fixed count crowds them together on a
+  // small ring — at the idle size they landed three pixels apart and turned a
+  // circle into a gear — and spreads them thin around a large one.
+  const SPACING = 16;
+  const LEAST = 8;
+  const MOST = 64;
+  const PROFILE = 64;
   let sketchSvg = null;
   let sketchPath = null;
   let hands = null;
@@ -52,8 +59,8 @@
       return seed / 2147483648 - 0.5;
     };
     const one = () => {
-      const out = new Array(SAMPLES);
-      for (let i = 0; i < SAMPLES; i++) out[i] = next() * 2;
+      const out = new Array(PROFILE);
+      for (let i = 0; i < PROFILE; i++) out[i] = next() * 2;
       return out;
     };
     return [one(), one()];
@@ -70,9 +77,13 @@
     const perimeter = 2 * flatX + 2 * flatY + 4 * arc;
     if (perimeter <= 0) return '';
 
-    const pts = new Array(SAMPLES);
-    for (let i = 0; i < SAMPLES; i++) {
-      let s = (i / SAMPLES) * perimeter;
+    // As many deviations as the line has room for, and the profile is read at
+    // the fraction round rather than by index, so the same wobble survives the
+    // ring changing size.
+    const count = Math.max(LEAST, Math.min(MOST, Math.round(perimeter / SPACING)));
+    const pts = new Array(count);
+    for (let i = 0; i < count; i++) {
+      let s = (i / count) * perimeter;
       let x, y, nx, ny, a;
       if (s < flatX) { x = r + s; y = 0; nx = 0; ny = -1; }
       else if ((s -= flatX) < arc) { a = -Math.PI / 2 + (s / arc) * (Math.PI / 2); x = w - r + Math.cos(a) * r; y = r + Math.sin(a) * r; nx = Math.cos(a); ny = Math.sin(a); }
@@ -82,18 +93,18 @@
       else if ((s -= flatX) < arc) { a = Math.PI / 2 + (s / arc) * (Math.PI / 2); x = r + Math.cos(a) * r; y = h - r + Math.sin(a) * r; nx = Math.cos(a); ny = Math.sin(a); }
       else if ((s -= arc) < flatY) { x = 0; y = h - r - s; nx = -1; ny = 0; }
       else { a = Math.PI + ((s - flatY) / arc) * (Math.PI / 2); x = r + Math.cos(a) * r; y = r + Math.sin(a) * r; nx = Math.cos(a); ny = Math.sin(a); }
-      const off = deviations[i] * wiggle;
+      const off = deviations[Math.floor((i / count) * PROFILE) % PROFILE] * wiggle;
       pts[i] = [x + nx * off, y + ny * off];
     }
 
     // Closed Catmull-Rom through the points, written as cubics: straight lines
     // between deviations would read as a polygon rather than a drawn line.
     let d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
-    for (let i = 0; i < SAMPLES; i++) {
-      const p0 = pts[(i - 1 + SAMPLES) % SAMPLES];
+    for (let i = 0; i < count; i++) {
+      const p0 = pts[(i - 1 + count) % count];
       const p1 = pts[i];
-      const p2 = pts[(i + 1) % SAMPLES];
-      const p3 = pts[(i + 2) % SAMPLES];
+      const p2 = pts[(i + 1) % count];
+      const p3 = pts[(i + 2) % count];
       d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + ' ' + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) +
            ' ' + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + ' ' + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) +
            ' ' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
