@@ -314,8 +314,11 @@ hook you must remember to call; everything else is automatic.
   cursor *inside* a cross-origin frame — a YouTube or Instagram embed will
   always show the visitor's own pointer.
 - **The page changing under a resting pointer** — clicking something that opens a
-  modal or closes a drawer produces no `mousemove`, so the ring would keep
-  hugging a now-covered element. The target is re-resolved once after each click.
+  modal or closes a drawer produces no `mousemove`, and neither does scrolling
+  the page past a pointer that has not moved. The ring would keep hugging what
+  it last saw, riding away with an element that has scrolled out from under the
+  pointer. What is underneath is re-resolved after a click and on scroll, once
+  per frame at most.
 
 ## A drawn ring
 

@@ -419,15 +419,23 @@
     host.appendChild(ring);
   });
 
-  // A click can swap the page under a resting pointer (opening a modal over
-  // the clicked card, closing a drawer …) without any mousemove — the ring
-  // would keep hugging the now-covered element, drawn through the overlay.
-  // Re-resolve once after the click has run; the overlays are
-  // pointer-events:none, so elementFromPoint sees the real element.
-  function onClick() {
+  // The page can change under a resting pointer with no mousemove to say so: a
+  // click opens a modal over the card it was on, or a scroll carries the whole
+  // page past a pointer that never moved. Left alone the ring keeps hugging
+  // whatever it last saw — riding away with an element that has scrolled out
+  // from under the pointer. Ask what is there now instead.
+  //
+  // elementFromPoint costs a layout read, which is why the pointer's own path
+  // never uses it; here it runs once per event at most, and once per frame.
+  let resolving = false;
+  function resolveUnderPointer() {
+    if (resolving) return;
+    resolving = true;
     requestAnimationFrame(() => {
+      resolving = false;
+      // The overlays are pointer-events:none, so this sees the real element.
       const el = document.elementFromPoint(mx, my);
-      if (el && el !== target) { target = el; dirty = true; }
+      if (el !== target) { target = el; dirty = true; }
     });
   }
 
@@ -441,13 +449,16 @@
     ring.style.display = on ? '' : 'none';
     if (on) {
       document.addEventListener('mousemove', onMove, { passive: true });
-      document.addEventListener('click', onClick, true);
+      document.addEventListener('click', resolveUnderPointer, true);
+      // Capture, so a scrolling container counts and not only the window.
+      document.addEventListener('scroll', resolveUnderPointer, { passive: true, capture: true });
       window.addEventListener('mouseout', onOut);
       window.addEventListener('blur', hide);
       raf = requestAnimationFrame(loop);
     } else {
       document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('click', onClick, true);
+      document.removeEventListener('click', resolveUnderPointer, true);
+      document.removeEventListener('scroll', resolveUnderPointer, { capture: true });
       window.removeEventListener('mouseout', onOut);
       window.removeEventListener('blur', hide);
       cancelAnimationFrame(raf);
