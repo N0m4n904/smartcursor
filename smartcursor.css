@@ -49,6 +49,10 @@ html.sc-on * { cursor: none !important; }
   left: 0;
   top: 0;
   pointer-events: none;
+  /* Said here rather than inherited: a page with a border-box reset — which is
+     most of them — would otherwise fold the border into the size the script
+     sets, leaving the ring smaller than the geometry it was given. */
+  box-sizing: border-box;
   /* Position comes from JS as a translate3d transform (compositor-only, no
      layout/paint) — never via left/top. */
   will-change: transform;
@@ -129,22 +133,29 @@ html.sc-on * { cursor: none !important; }
    --------------------------------------------------------------------------- */
 
 .smart-cursor-ring.sketch {
-  border-color: transparent;
+  /* No border at all rather than a transparent one, so the drawing covers the
+     whole box instead of the space left inside the border. */
+  border: 0;
   box-shadow: none;
   overflow: visible;
 }
 
 /* The drawing is only present while the ring is hugging something; idle, the
-   bordered circle above is the whole cursor. */
-.smart-cursor-ring:not(.sketch) svg {
-  display: none;
-}
-
-.smart-cursor-ring.sketch svg {
+   bordered circle above is the whole cursor. The two cross-fade on the same
+   curve the border does: hiding the drawing outright left a fifth of a second
+   with neither of them painted, which reads as a blink every time the pointer
+   leaves an element. */
+.smart-cursor-ring svg {
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.smart-cursor-ring.sketch svg {
+  opacity: 1;
 }
 
 .smart-cursor-ring.sketch path {
